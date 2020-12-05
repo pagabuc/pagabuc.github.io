@@ -172,7 +172,7 @@ img { max-width: 100%; }
 
 .wrapper { width: 60%; margin: 0px; margin-left: 10%; }
 
-header { width: 250px; float: left; position: fixed; text-align: center; -webkit-font-smoothing: subpixel-antialiased; }
+header { width: 280px; float: left; position: fixed; text-align: center; -webkit-font-smoothing: subpixel-antialiased; }
 
 body { background-color: #fff; padding-top: 80px; font-family: 'Lato'; font-size: 13pt; color: #5e5e5e; }
 
