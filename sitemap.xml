@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
-<loc>https://pagabuc.me/another-page.html</loc>
-</url>
-<url>
 <loc>https://pagabuc.me/</loc>
 </url>
 <url>
@@ -39,10 +36,6 @@
 <lastmod>2021-01-02T13:06:12-08:00</lastmod>
 </url>
 <url>
-<loc>https://pagabuc.me/pubs.html</loc>
-<lastmod>2021-01-06T23:49:19-08:00</lastmod>
-</url>
-<url>
 <loc>https://pagabuc.me/slides/codaspy18_pagani.slides.pdf</loc>
 <lastmod>2020-10-19T20:00:40-07:00</lastmod>
 </url>
@@ -69,9 +62,5 @@
 <url>
 <loc>https://pagabuc.me/slides/usenixsec19_pagani.slides.pdf</loc>
 <lastmod>2020-10-19T20:00:40-07:00</lastmod>
-</url>
-<url>
-<loc>https://pagabuc.me/talks.html</loc>
-<lastmod>2021-01-06T23:49:19-08:00</lastmod>
 </url>
 </urlset>
