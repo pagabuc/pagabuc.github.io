@@ -150,6 +150,8 @@ h3, h4, h5, h6 { color: #494949; }
 
 a { color: #cb4b16; text-decoration: none; }
 
+.title { color: #cb4b16; text-decoration: none; }
+
 .fa:hover, .fa:focus, .ai:hover, .ai:focus { color: #b64313; text-decoration: none; }
 
 a:hover, a:focus { color: #b64313; font-weight: bold; }
