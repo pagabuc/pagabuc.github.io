@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.2">Jekyll</generator><link href="https://pagabuc.me/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="https://pagabuc.me/blog/" rel="alternate" type="text/html" /><updated>2022-08-07T19:36:32-07:00</updated><id>https://pagabuc.me/blog/feed.xml</id><title type="html">Fabio Pagani</title><subtitle>Mostly security
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.2">Jekyll</generator><link href="https://pagabuc.me/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="https://pagabuc.me/blog/" rel="alternate" type="text/html" /><updated>2022-08-07T19:50:10-07:00</updated><id>https://pagabuc.me/blog/feed.xml</id><title type="html">Fabio Pagani</title><subtitle>Mostly security
 </subtitle><author><name>Fabio Pagani</name><email>pagabuc@gmail.com</email></author><entry><title type="html">UIUCTF 2022 - SMM Cowsay 1 and 2</title><link href="https://pagabuc.me/blog/smm-cowsay-1-and-2-uiuctf-2022" rel="alternate" type="text/html" title="UIUCTF 2022 - SMM Cowsay 1 and 2" /><published>2022-08-08T00:00:00-07:00</published><updated>2022-08-08T00:00:00-07:00</updated><id>https://pagabuc.me/blog/smm-cowsay-1-and-2-uiuctf-2022</id><content type="html" xml:base="https://pagabuc.me/blog/smm-cowsay-1-and-2-uiuctf-2022"><![CDATA[<p><strong>TL;DR: Exploiting code running in System Management Mode (aka Ring -2)</strong></p>
 
 <h3 id="introduction">Introduction</h3>
@@ -16,11 +16,11 @@ It is used for different firmware-level stuff, from advanced-power management to
 The transition from any CPU mode to SMM happens when a System Management Interrupt (SMI) is delivered to the CPU:
 <img src="/blog/assets/images/transition_among_operating_modes.png" alt="Operating Modes" /></p>
 
-<p>This transition involves a process similar to a context-swith.
+<p>This transition involves a process similar to a context-switch.
 When the CPU enters SMM it saves its state (registers) in the System Management RAM (SMRAM).
 The hardware then jumps to the SMI handler and, once the handler has completed its task, it executes the <code class="language-plaintext highlighter-rouge">rsm</code> instruction to re-load the state saved in SMRAM and it gives back control to the OS.</p>
 
-<p>The good news is that most of this process is transparent, thanks to the UEFI firmware development enviroment <a href="https://github.com/tianocore/edk2">TianoCore EDK II</a>.
+<p>The good news is that most of this process is transparent, thanks to the UEFI firmware development environment <a href="https://github.com/tianocore/edk2">TianoCore EDK II</a>.
 I am not an UEFI expert, but to solve this challenge is enough to know that SMI Handlers register themselves during boot.
 Each SMI handler is identified by a given GUID, and to interact with them from non-SMM code we only need pass this GUID to some EDK II functions.
 The framework takes care of making our parameter accessible from SMM, but also of entering SMM and dispatching the execution to the correct SMI handler.</p>
@@ -337,11 +337,11 @@ After sending this message, GDB will trap in SMM (you can double check this by s
 <figcaption>Snippet from 'qemu-5.0.0/target/i386/translate.c'</figcaption>
 </figure>
 
-<p>Finally, since this will likely turn into ROPing our way to the flag, I wrote this simple <a href="/blog/assets/code/dumper_script.py">GDB script</a> to dump all the mapped pages and find the address of any ROP gadget we will need.</p>
+<p>Finally, since this will likely turn into ROPping our way to the flag, I wrote this simple <a href="/blog/assets/code/dumper_script.py">GDB script</a> to dump all the mapped pages and find the address of any ROP gadget we will need.</p>
 
 <h3 id="exploitation">Exploitation</h3>
 <p>After crafting a message that is 408 bytes long, I put a breakpoint at the <code class="language-plaintext highlighter-rouge">mDebugData.CowsayFunc</code> callsite (address 0x7ee92c5) to inspect the program state.
-Since UEFI uses the Microsoft calling covention, <code class="language-plaintext highlighter-rouge">rcx</code> will contain a pointer to CommBuffer, while <code class="language-plaintext highlighter-rouge">rdx</code> is <code class="language-plaintext highlighter-rouge">CommBufferSize</code>.</p>
+Since UEFI uses the Microsoft calling convention, <code class="language-plaintext highlighter-rouge">rcx</code> will contain a pointer to CommBuffer, while <code class="language-plaintext highlighter-rouge">rdx</code> is <code class="language-plaintext highlighter-rouge">CommBufferSize</code>.</p>
 
 <p>In short, we used the following exploit strategy to solve the challenge:</p>
 
@@ -405,13 +405,13 @@ Since UEFI uses the Microsoft calling covention, <code class="language-plaintext
     <span class="nf">.quad</span> <span class="mh">0xAABBCCDD</span>
 
     <span class="nf">.quad</span> <span class="mh">0x7ee9463</span> <span class="o">//</span> <span class="nv">CowSay</span>
-
 <span class="nl">rop_chain.end:</span>
 </code></pre></div></div>
 
 <p>As with SMM Cowsay 1, don’t forget to leak the odd indexes of the flag, and zip the two parts to get the final flag <code class="language-plaintext highlighter-rouge">uiuctf{dont_try_this_at_home_I_mean_at_work_5dfbf3eb}</code>.</p>
 
 <h2 id="conclusions">Conclusions</h2>
-<p>What a fun challenges—I really like challenges divided in multiple steps, were you keep refining some knowledge about a system to solve increasingly difficult problems. Moreover, these systems challenge and really my favourite, I always end up going down several rabbit holes that make me learn about interesting and super-low-level concepts.</p>
+<p>What a fun challenges. I really like challenges divided in multiple steps, were you keep refining some knowledge about a system to solve increasingly difficult problems.
+Finally, these systems challenges are definitely my favorite… I always end up going down several rabbit holes that make me learn about interesting low-level concepts.</p>
 
-<p>Thanks to <code class="language-plaintext highlighter-rouge">YiFei Zhu</code> for this great challenges!</p>]]></content><author><name>Fabio Pagani</name><email>pagabuc@gmail.com</email></author><summary type="html"><![CDATA[TL;DR: Exploiting code running in System Management Mode (aka Ring -2)]]></summary></entry></feed>
+<p>Thanks to <code class="language-plaintext highlighter-rouge">YiFei Zhu</code> for these great challenges!</p>]]></content><author><name>Fabio Pagani</name><email>pagabuc@gmail.com</email></author><summary type="html"><![CDATA[TL;DR: Exploiting code running in System Management Mode (aka Ring -2)]]></summary></entry></feed>
