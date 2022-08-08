@@ -176,7 +176,7 @@ img { max-width: 100%; }
 
 header { width: 285px; float: left; position: fixed; text-align: center; -webkit-font-smoothing: subpixel-antialiased; }
 
-body { background-color: #fff; padding-top: 80px; font-family: 'Lato'; font-size: 13pt; color: #5e5e5e; }
+body { background-color: #fff; padding-top: 80px; font-family: 'Lato'; font-size: 13pt; color: #3e3e3e; }
 
 section { width: 80%; float: left; margin-left: 350px; padding-bottom: 50px; }
 
